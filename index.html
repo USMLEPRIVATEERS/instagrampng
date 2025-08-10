@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF para Imagens - Conversor Premium</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -550,6 +551,13 @@
             color: #667eea;
             display: block;
             margin-bottom: 5px;
+            word-break: break-word;
+            line-height: 1.2;
+        }
+
+        .stat-number.small-text {
+            font-size: 14px;
+            font-weight: 600;
         }
 
         .stat-label {
@@ -673,8 +681,8 @@
                         <span class="stat-label">Tamanho</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-number" id="resolution">300 DPI</span>
-                        <span class="stat-label">Resolução</span>
+                        <span class="stat-number" id="fileName">-</span>
+                        <span class="stat-label">Arquivo</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-number" id="format">PNG</span>
@@ -703,6 +711,7 @@
         let pdfDoc = null;
         let renderedPages = [];
         let originalFileSize = 0;
+        let originalFileName = '';
 
         // Elementos DOM
         const fileInput = document.getElementById('fileInput');
@@ -725,6 +734,7 @@
             const file = e.target.files[0];
             if (file && file.type === 'application/pdf') {
                 originalFileSize = file.size;
+                originalFileName = file.name.replace('.pdf', '').replace(/[^a-zA-Z0-9\s\-_]/g, ''); // Remove extensão e caracteres especiais
                 loadPDF(file);
             } else {
                 showStatus('⚠️ Por favor, selecione um arquivo PDF válido.', 'error');
@@ -742,6 +752,7 @@
             const file = e.dataTransfer.files[0];
             if (file && file.type === 'application/pdf') {
                 originalFileSize = file.size;
+                originalFileName = file.name.replace('.pdf', '').replace(/[^a-zA-Z0-9\s\-_]/g, ''); // Remove extensão e caracteres especiais
                 loadPDF(file);
             } else {
                 showStatus('⚠️ Por favor, selecione um arquivo PDF válido.', 'error');
@@ -779,6 +790,12 @@
         function updateStats() {
             document.getElementById('totalPages').textContent = pdfDoc.numPages;
             document.getElementById('fileSize').textContent = (originalFileSize / (1024 * 1024)).toFixed(1) + ' MB';
+            
+            const fileNameElement = document.getElementById('fileName');
+            fileNameElement.textContent = originalFileName.length > 15 ? 
+                originalFileName.substring(0, 15) + '...' : originalFileName;
+            fileNameElement.classList.add('small-text');
+            fileNameElement.title = originalFileName; // Tooltip com nome completo
         }
 
         async function renderAllPages() {
@@ -848,8 +865,10 @@
             const pageData = renderedPages[index];
             if (!pageData) return;
             
+            const fileName = `Pagina ${pageData.pageNum} - ${originalFileName}.png`;
+            
             const link = document.createElement('a');
-            link.download = `pagina-${pageData.pageNum}.png`;
+            link.download = fileName;
             link.href = pageData.dataUrl;
             
             // Para iOS Safari
@@ -862,7 +881,7 @@
                 document.body.removeChild(link);
             }
             
-            showStatus(`✅ Página ${pageData.pageNum} baixada com sucesso!`, 'success');
+            showStatus(`✅ ${fileName} baixada com sucesso!`, 'success');
         }
 
         async function downloadAll() {
@@ -892,12 +911,13 @@
                     
                     renderedPages.forEach(pageData => {
                         const base64Data = pageData.dataUrl.split(',')[1];
-                        zip.file(`pagina-${pageData.pageNum}.png`, base64Data, { base64: true });
+                        const fileName = `Pagina ${pageData.pageNum} - ${originalFileName}.png`;
+                        zip.file(fileName, base64Data, { base64: true });
                     });
                     
                     const content = await zip.generateAsync({ type: 'blob' });
                     const link = document.createElement('a');
-                    link.download = 'pdf-imagens.zip';
+                    link.download = `${originalFileName} - Todas as Paginas.zip`;
                     link.href = URL.createObjectURL(content);
                     link.click();
                     
